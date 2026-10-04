@@ -1,0 +1,65 @@
+{
+  "statistical_config_version": "1.0.0",
+  "preregistered_at": "2026-10-04",
+  "note": "Hyperparamètres préenregistrés. Toute modification crée une nouvelle version de fichier (stat_config_v2.json) ; ne jamais éditer une version déjà utilisée par un ForecastRecord.",
+
+  "horizon_buckets_days": [30, 90, 365, 1825],
+
+  "dirichlet": {
+    "id": "dir-v1-prudent",
+    "alpha": {"base_rate": 8.0, "bayes_hierarchical": 0.25, "market_anchor": 0.25},
+    "class_concentration": 20.0,
+    "sensitivity_grid": [
+      {"id": "dir-v1-tres-prudent", "alpha": {"base_rate": 16.0, "bayes_hierarchical": 0.25, "market_anchor": 0.25}},
+      {"id": "dir-v1-souple", "alpha": {"base_rate": 4.0, "bayes_hierarchical": 0.5, "market_anchor": 0.5}}
+    ]
+  },
+
+  "stacking": {
+    "half_life_days": 180.0,
+    "window_days": 730.0,
+    "em_max_iter": 5000,
+    "em_tol": 1e-13,
+    "changepoint": {"method": "page_hinkley", "delta": 0.1, "threshold": 10.0, "min_obs": 8, "calibration": "seuil choisi le 2026-10-04 sur historiques synthétiques avant tout usage réel : 1 % de fausses alarmes (n=600 sains), 100 % de détection (60 résolutions dégradées sur 260)"}
+  },
+
+  "base_rate": {
+    "global_prior": [0.5, 0.5],
+    "level_pseudo_obs": 10.0,
+    "widening_pseudo_obs": 2.0
+  },
+
+  "bayes": {
+    "evidence_types": ["statistic", "poll", "official_statement", "expert_opinion", "market_price", "scheduled_event", "osint", "scientific", "news_report", "other"],
+    "mu0": 0.3,
+    "mu0_sd": 0.2,
+    "tau": 0.25,
+    "newton_max_iter": 100,
+    "newton_tol": 1e-12
+  },
+
+  "systematic_bias": {
+    "floor_logit_var": 0.15,
+    "domain_pseudo_obs": 10.0,
+    "ancestor_k": 1.0
+  },
+
+  "extraction": {
+    "prior_error_rate": [1.0, 9.0],
+    "pooling_strength": 10.0,
+    "types": ["date", "entity", "relation", "causality"]
+  },
+
+  "market": {"clip": [0.01, 0.99], "logit_var": 0.05},
+
+  "resolvability": {
+    "source_kind_scores": {"official_api": 0.95, "official_statistics": 0.9, "official_statement": 0.8, "market_platform": 0.8, "reputable_media": 0.65, "other": 0.4},
+    "unambiguous_prior": [4.0, 1.0]
+  },
+
+  "reconciliation": {"scoring_rule": "log", "soft_penalty": 10.0, "eps": 1e-9, "max_iter": 5000, "tol": 1e-13, "max_linked": 9},
+
+  "ingestion": {"n_reformulations": 3, "n_extractions": 3, "temperature": 0.7, "seed": 1729},
+
+  "evaluation": {"bootstrap_reps": 2000, "seed": 20261004, "calibration_bins": 10, "mcs_alpha": 0.10}
+}

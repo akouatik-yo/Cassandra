@@ -1,0 +1,7 @@
+# Dépendances verrouillées. Le moteur (engine/) et le registre (ledger/) n'en ont AUCUNE :
+# bibliothèque standard Python >= 3.11 uniquement. Le SDK n'est utilisé que par ingestion/.
+# Le hash SHA-256 de ce fichier est inscrit dans chaque ForecastRecord (dependency_lock_hash).
+python>=3.11
+anthropic==1.11.0
+# développement
+pytest==9.1.1
