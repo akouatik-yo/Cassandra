@@ -169,14 +169,17 @@ quand 60 résolutions sur 260 sont dégradées.
 
 | Réglage | α diffus / informés | N = 0 | 25 | 50 | 100 | 200 | 400 |
 |---|---|---|---|---|---|---|---|
-| Marché informatif, prudent (retenu) | 8 / 0,25 | 0,05 | 0,16 | 0,31 | 0,55 | 0,70 | 0,80 |
+| Marché informatif, **v2 souple (en vigueur)** | 4 / 0,1 | 0,04 | 0,29 | 0,45 | 0,66 | 0,77 | 0,84 |
+| Marché informatif, v1 prudent | 8 / 0,25 | 0,05 | 0,16 | 0,31 | 0,55 | 0,70 | 0,80 |
 | Marché informatif, très prudent | 16 / 0,25 | 0,03 | 0,06 | 0,13 | 0,36 | 0,60 | 0,75 |
-| Marché informatif, souple | 4 / 0,5 | 0,18 | 0,41 | 0,52 | 0,68 | 0,77 | 0,84 |
-| Marché = bruit, prudent (retenu) | 8 / 0,25 | 0,05 | 0,06 | 0,06 | 0,06 | 0,06 | 0,06 |
+| Marché informatif, souple de la grille v1 | 4 / 0,5 | 0,18 | 0,41 | 0,52 | 0,68 | 0,77 | 0,84 |
+| Marché = bruit, **v2 souple (en vigueur)** | 4 / 0,1 | 0,04 | 0,05 | 0,05 | 0,05 | 0,05 | 0,05 |
+| Marché = bruit, souple de la grille v1 | 4 / 0,5 | 0,18 | 0,19 | 0,19 | 0,19 | 0,19 | 0,18 |
 
-Lecture : avec le réglage retenu, une source fiable obtient la moitié du poids après une centaine de
-résolutions ; une source sans valeur reste à 6 %. Le réglage « souple » apprend plus vite mais part de
-w = 0,18 sans aucun historique, ce qui s'écarte de l'exigence « sans historique, w → 0 ».
+Lecture : avec le réglage en vigueur (v2), une source fiable obtient les deux tiers du poids après une
+centaine de résolutions ; une source sans valeur reste à 5 %. Le souple de la grille v1 (4 / 0,5) apprend un peu
+plus vite au tout début, mais part de w = 0,18 sans historique et laisse 18 % du poids à une source sans valeur,
+ce qui s'écarte de l'exigence « sans historique, w → 0 ».
 
 ### Journal des décisions sur la configuration
 
