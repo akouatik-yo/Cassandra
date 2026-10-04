@@ -124,6 +124,29 @@ class OracleApp:
                             "retrieval_hash": hash_obj([]), "retrieval": [], "edits": None, "validated": False}
         return {"draft_id": did, "draft": copy.deepcopy(draft)}
 
+    def manual_draft(self, fields: dict, now: str | None = None) -> dict:
+        """Formalisation saisie à la main (sans LLM) : la règle est celle de l'utilisateur."""
+        now = now or utc_now()
+        draft = {
+            "input_text": fields.get("text", ""), "now": now, "question_type": fields.get("question_type", "binary"),
+            "text": fields.get("text", ""), "definition": fields.get("definition", ""),
+            "resolution_rule": fields.get("resolution_rule", ""), "resolution_source": fields.get("resolution_source", ""),
+            "source_kind": fields.get("source_kind", "other"), "resolution_deadline": fields.get("resolution_deadline", ""),
+            "horizon": fields.get("horizon", ""), "ambiguity_policy": fields.get("ambiguity_policy", "cancel"),
+            "domain": fields.get("domain", "other"), "subquestions": [], "test_scenarios": [],
+            "self_negating_risk": bool(fields.get("self_negating_risk", False)),
+            "self_negating_reason": fields.get("self_negating_reason", ""),
+            "resolution_stability_score": float(fields.get("resolution_stability_score", 1.0)),
+            "resolution_inter_model_agreement": None,
+            "resolution_human_validated": bool(fields.get("resolution_human_validated", True)),
+            "rule_validation_protocol": {"n_reformulations": 0, "agreement_metric": "saisie manuelle, sans LLM"},
+        }
+        did = str(uuid.uuid4())
+        self.drafts[did] = {"draft": draft, "session": None, "sources": [], "lineage": [], "rejected": [],
+                            "retrieval_hash": hash_obj([]), "retrieval": [], "edits": None,
+                            "validated": draft["resolution_human_validated"], "draft_override": draft}
+        return {"draft_id": did, "draft": copy.deepcopy(draft)}
+
     def add_sources(self, draft_id: str, sources: list[dict]) -> dict:
         """Les sources sont extraites au moment du gel, APRÈS validation de la règle."""
         self.drafts[draft_id]["sources"] = list(sources)
@@ -131,6 +154,12 @@ class OracleApp:
 
     def validate(self, draft_id: str, edits: dict | None, validated: bool) -> dict:
         d = self.drafts[draft_id]
+        if d["session"] is None:
+            d["draft"].update({k: v for k, v in (edits or {}).items() if v not in (None, "")})
+            d["draft"]["resolution_human_validated"] = bool(validated)
+            d["draft_override"] = copy.deepcopy(d["draft"])
+            d["validated"] = validated
+            return copy.deepcopy(d["draft"])
         apply_human_validation(d["session"], d["draft"], edits, validated)
         d["edits"], d["validated"] = edits, validated
         return copy.deepcopy(d["draft"])
@@ -147,7 +176,7 @@ class OracleApp:
         iso_duration_days(draft["horizon"])
         links = links or []
         as_of = draft["now"]
-        if d["sources"]:
+        if d["sources"] and d["session"] is not None:
             ex = extract_sources(d["session"], draft, d["sources"], as_of)
             d.update(lineage=ex["lineage"], rejected=ex["rejected"], retrieval_hash=ex["retrieval_snapshot_hash"])
         prev = None
@@ -339,6 +368,26 @@ class OracleApp:
                 continue
             done.append(self.resolve(qid, it["resolution"], it.get("url", it["platform"]), 0.9))
         return done
+
+    def demo_history(self, n: int = 40, seed: int = 1729) -> int:
+        """Historique SYNTHÉTIQUE (bac à sable uniquement) : questions fictives
+        avec un prix de marché bruité et une issue tirée selon une probabilité cachée."""
+        from .canonical import Mulberry32
+        from datetime import datetime, timedelta, timezone
+        rng = Mulberry32(seed)
+        deadline = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
+        for i in range(n):
+            pi = 0.1 + 0.8 * rng.random()
+            mkt = min(0.97, max(0.03, pi + 0.2 * (rng.random() - 0.5)))
+            y = 1 if rng.random() < pi else 0
+            d = self.manual_draft({
+                "text": f"[Démo synthétique] Événement fictif n°{i + 1}",
+                "resolution_rule": "Issue tirée au hasard (données synthétiques de démonstration).",
+                "resolution_source": "synthetique://demo", "resolution_deadline": deadline, "horizon": "P30D",
+                "ambiguity_policy": "cancel", "domain": "other", "source_kind": "official_statistics"})
+            rec = self.commit(d["draft_id"], market={"p": mkt, "source": "marché synthétique"})
+            self.resolve(rec["question"]["question_id"], y, "synthetique://demo", 0.9)
+        return n
 
     # ------------------------------------------------------------ vues
     def verify(self) -> dict:

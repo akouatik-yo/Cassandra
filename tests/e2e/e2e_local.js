@@ -1,0 +1,65 @@
+// Parcours complet de la version hébergée (mode local) dans Chromium, avec claude.ai simulé.
+// Usage : node tests/e2e/e2e_local.js <dossier_sortie>   (après python scripts/build_web.py)
+const { chromium } = require("playwright");
+const fs = require("fs"), path = require("path");
+(async () => {
+  const out = process.argv[2] || ".";
+  const root = path.resolve(__dirname, "../..");
+  const page_html = "<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head><body><script>" +
+    fs.readFileSync(path.join(__dirname, "mock_claude.js"), "utf8") + "</script>" + fs.readFileSync(path.join(root, "web/dist/index.html"), "utf8") + "</body></html>";
+  const file = path.join(out, "local_test.html");
+  fs.writeFileSync(file, page_html);
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  page.on("console", (m) => { if (m.type() === "error" && !m.text().includes("ERR_CERT") && !m.text().includes("ERR_NAME") && !m.text().includes("fonts")) errors.push(m.text()); });
+  await page.goto("file://" + file);
+  await page.waitForSelector("#q-text");
+  console.log("pastilles :", (await page.textContent("#chips")).replace(/\s+/g, " ").trim());
+  await page.fill("#q-text", "Le chômage baissera-t-il sous 7 % ?");
+  await page.click("details.opt summary");
+  await page.click("#add-src");
+  await page.fill("#s-t-0", "Note A");
+  await page.fill("#s-d-0", "2026-09-28");
+  await page.fill("#s-u-0", "https://ex.org/a");
+  await page.fill("#s-x-0", "Hausse confirmée|2026-09-27|INSEE|yes|statistic\nSondage favorable|2026-09-25|IFOP|yes|poll\nReport possible|2026-09-26|Ministère|no|official_statement");
+  await page.click("#add-src");
+  await page.fill("#s-t-1", "Reprise de A");
+  await page.fill("#s-d-1", "2026-09-29");
+  await page.fill("#s-x-1", "Hausse confirmée (reprise)|2026-09-27|INSEE|yes|statistic");
+  await page.click("#go-llm");
+  await page.waitForSelector("table.verdicts", { timeout: 60000 });
+  console.log("stabilité :", (await page.textContent(".panel.stab")).replace(/\s+/g, " ").slice(0, 90));
+  await page.fill("#v-rule", "OUI si le taux BIT publié par l'INSEE est strictement inférieur à 7,0 %.");
+  await page.click("#v-ok");
+  await page.waitForSelector(".pbig", { timeout: 60000 });
+  console.log("p :", await page.textContent(".pbig"), "| alerte :", (await page.locator(".record .alert").count()) > 0,
+    "| lignes de lignage :", await page.locator(".record table.tbl").nth(1).locator("tbody tr").count(), "| appels sample :", await page.evaluate(() => window.__sampleCalls));
+  await page.screenshot({ path: path.join(out, "local_result.png"), fullPage: true });
+  await page.click(".record details.opt summary");
+  await page.click(".record .replay");
+  await page.waitForSelector(".replay-out .chip", { timeout: 60000 });
+  console.log("rejeu :", await page.textContent(".replay-out"), "| appels sample après rejeu :", await page.evaluate(() => window.__sampleCalls));
+  await page.click('a[data-tab="registre"]');
+  await page.click("#verify");
+  await page.waitForSelector("#vres .panel");
+  console.log("vérif :", (await page.textContent("#vres")).replace(/\s+/g, " ").slice(0, 60));
+  const entries = await page.evaluate(() => Array.from(window.__mockDocs.entries()).filter(([p]) => p.startsWith("reel_ledger/")).map(([, d]) => d).sort((a, b) => a.seq - b.seq));
+  fs.writeFileSync(path.join(out, "ledger_from_js.json"), JSON.stringify(entries));
+  await page.evaluate(() => { for (const [p, d] of window.__mockDocs) if (p.startsWith("reel_ledger/") && d.record_type === "forecast") { d.record.final_output.p_raw = 0.99; } });
+  await page.click("#verify");
+  await page.waitForFunction(() => document.querySelector("#vres").textContent.includes("altérée"), null, { timeout: 30000 });
+  console.log("après altération :", (await page.textContent("#vres")).replace(/\s+/g, " ").slice(0, 110));
+  await page.click("#ns-demo");
+  await page.waitForFunction(() => document.querySelector("#chips").textContent.includes("Bac à sable"));
+  await page.click('a[data-tab="tournoi"]');
+  await page.click("#demo");
+  await page.waitForSelector("table.tbl", { timeout: 180000 });
+  console.log("tournoi :", (await page.textContent(".panel")).trim().slice(0, 80));
+  await page.click('a[data-tab="calibration"]');
+  await page.waitForSelector(".calib");
+  await page.screenshot({ path: path.join(out, "local_calibration.png"), fullPage: true });
+  console.log("erreurs :", errors.length ? errors : "aucune");
+  await browser.close();
+})().catch((e) => { console.error("ÉCHEC", e); process.exit(1); });
