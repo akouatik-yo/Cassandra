@@ -111,9 +111,10 @@ Pooling hiérarchique : poids globaux avec le prior prudent, puis poids par clas
 prior centré sur les poids globaux (concentration 20). Classe vide → poids globaux ; aucun historique → prior.
 
 **Détecteur de rupture.** Page-Hinkley sur la perte relative de chaque composant face au composant diffus.
-Si un composant rompt, on réestime les poids après la rupture ; son poids devient le minimum des deux et
-**la masse retirée va au composant diffus**, jamais aux autres sources (une rupture peut signaler un
-changement de régime qui touche aussi les sources corrélées).
+Si un composant rompt, on réestime les poids avant et après la rupture. Son poids devient le minimum du
+poids complet et du poids après rupture ; chaque autre source informée est plafonnée à son poids d'avant la
+rupture ; **toute la masse libérée va au composant diffus**, jamais aux autres sources (une rupture peut
+signaler un changement de régime qui touche aussi les sources corrélées).
 
 **Résolubilité** (continue, jamais bloquante). Moyenne géométrique de : clarté de la règle (stabilité, et
 accord inter-modèles s'il existe), nature de la source, fréquence des résolutions non annulées dans la classe.
@@ -140,13 +141,14 @@ variances. Elle décrit l'incertitude sur p ; le score s'applique à p.
 
 ## Hyperparamètres préenregistrés
 
-Tous dans `config/stat_config_v1.json`, dont le hash est inscrit dans chaque `ForecastRecord`
+Configuration en vigueur : `config/stat_config_v2.json` (la v1 est conservée telle quelle). Son hash est inscrit dans chaque `ForecastRecord`
 (`statistical_config_version`, `statistical_config_hash`). **Règle : une version déjà utilisée ne se modifie
-jamais** ; tout changement crée `stat_config_v2.json`, et le tournoi compare les versions.
+jamais** ; tout changement crée un nouveau fichier (`stat_config_v2.json`…). Chaque enregistrement portant
+sa version, les évaluations peuvent être séparées par version.
 
 | Paramètre | Valeur | Rôle |
 |---|---|---|
-| `dirichlet.alpha` | diffus 8 ; bayésien 0,25 ; marché 0,25 | Prior prudent : w ≈ 0,05 sans historique |
+| `dirichlet.alpha` | diffus 4 ; bayésien 0,1 ; marché 0,1 | Prior « souple » (v2) : w ≈ 0,04 sans historique |
 | `dirichlet.class_concentration` | 20 | Rappel des poids de classe vers les poids globaux |
 | `stacking.half_life_days` / `window_days` | 180 / 730 | Décroissance et fenêtre glissante |
 | `stacking.changepoint` | δ = 0,1 ; seuil 10 | Page-Hinkley (calibration ci-dessous) |
@@ -175,6 +177,13 @@ quand 60 résolutions sur 260 sont dégradées.
 Lecture : avec le réglage retenu, une source fiable obtient la moitié du poids après une centaine de
 résolutions ; une source sans valeur reste à 6 %. Le réglage « souple » apprend plus vite mais part de
 w = 0,18 sans aucun historique, ce qui s'écarte de l'exigence « sans historique, w → 0 ».
+
+### Journal des décisions sur la configuration
+
+| Version | Date | Changement | Raison |
+|---|---|---|---|
+| 1.0.0 | 2026-10-04 | Configuration initiale ; seuil du détecteur de rupture calibré sur données synthétiques | Préenregistrement |
+| 2.0.0 | 2026-10-04 | Prior de Dirichlet diffus 8 → 4, informés 0,25 → 0,1 | Décision de l'utilisateur après l'analyse de sensibilité, avant toute prévision réelle (registre réel vide). La variante 4 / 0,5 de la grille a été écartée : elle part de w = 0,18 sans historique, contraire au test 4. |
 
 ## Évaluation
 
@@ -262,8 +271,9 @@ pour qu'elles ne passent pas grâce à une graine favorable. `tests/e2e/` contie
    cohérentes que si w est la part donnée aux composants **informés**. Retenu : **w = 1 − poids du composant
    diffus**. Le poids du diffus reste visible dans `stacking_weights.base_rate`.
 2. **Effet de la résolubilité** : elle multiplie les poids informatifs appris ; la masse retirée va au diffus.
-3. **Rupture** : la masse perdue par le composant en rupture va au diffus (voir plus haut), même quand un autre
-   composant serait meilleur sur la période récente. C'est plus prudent que l'optimum du score.
+3. **Rupture** : la masse perdue par le composant en rupture va au diffus, et les autres sources sont
+   plafonnées à leur poids d'avant la rupture (voir plus haut), même quand l'une d'elles serait meilleure sur
+   la période récente. C'est plus prudent que l'optimum du score.
 4. **Collecte des sources** : l'utilisateur colle des documents datés. Aucune recherche web automatique,
    faute de corpus figé à la date de la question ; c'est le moyen le plus simple de garantir le filtre de date.
 5. **Sens des indices** : le LLM classe chaque fait comme favorable, défavorable ou neutre. C'est une

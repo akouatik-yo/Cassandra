@@ -8,7 +8,7 @@ from pathlib import Path
 from .canonical import hash_obj, sha256_hex
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CONFIG = ROOT / "config" / "stat_config_v1.json"
+DEFAULT_CONFIG = ROOT / "config" / "stat_config_v2.json"  # v1 conservée, jamais modifiée
 DEFAULT_PROMPTS = ROOT / "prompts" / "prompts_v1.json"
 LOCK_FILE = ROOT / "requirements.lock"
 

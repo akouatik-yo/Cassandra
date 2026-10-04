@@ -410,9 +410,14 @@
     let [w, it] = emWeights(rows.map((r) => [r.v, r.y, r.ps]), alpha, st.em_max_iter, st.em_tol);
     const breaks = detectBreaks(rows, names, cfg), bi = names.indexOf("base_rate");
     for (const n of Object.keys(breaks).sort()) {
-      const j = names.indexOf(n);
-      const [wp] = emWeights(rows.slice(breaks[n]).map((r) => [r.v, r.y, r.ps]), alpha, st.em_max_iter, st.em_tol);
-      if (wp[j] < w[j]) { w[bi] += w[j] - wp[j]; w[j] = wp[j]; }
+      const j = names.indexOf(n), b = breaks[n];
+      const [wp] = emWeights(rows.slice(b).map((r) => [r.v, r.y, r.ps]), alpha, st.em_max_iter, st.em_tol);
+      const [wpre] = emWeights(rows.slice(0, b).map((r) => [r.v, r.y, r.ps]), alpha, st.em_max_iter, st.em_tol);
+      let freed = 0;
+      if (wp[j] < w[j]) { freed += w[j] - wp[j]; w[j] = wp[j]; }
+      // Les autres sources ne profitent pas de la rupture : plafonnées à leur poids d'avant.
+      names.forEach((m, i) => { if (i !== bi && i !== j && !(m in breaks) && w[i] > wpre[i]) { freed += w[i] - wpre[i]; w[i] = wpre[i]; } });
+      w[bi] += freed;
     }
     return [w, breaks, it];
   }

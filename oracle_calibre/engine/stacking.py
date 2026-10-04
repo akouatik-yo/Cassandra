@@ -104,22 +104,31 @@ def _fit_level(rows: list[dict], names: list[str], alpha: list[float], cfg: dict
     """EM sur la fenêtre, puis retour vers la prudence des composants en rupture.
 
     Pour un composant k en rupture à l'indice b, on réestime les poids sur
-    les seules lignes postérieures à b (même prior) ; son poids devient
-    min(poids complet, poids après rupture) et la masse retirée va au
-    composant diffus, jamais aux autres sources : une rupture peut signaler
-    un changement de régime qui touche aussi les sources corrélées.
+    les lignes postérieures à b et sur les lignes antérieures (même prior).
+    Son poids devient min(poids complet, poids après rupture) ; chaque autre
+    source informée est plafonnée à son poids d'avant la rupture ; toute la
+    masse libérée va au composant diffus, jamais aux autres sources : une
+    rupture peut signaler un changement de régime qui touche aussi les
+    sources corrélées.
     """
     st = cfg["stacking"]
     w, it = em_weights([(r["v"], r["y"], r["ps"]) for r in rows], alpha, st["em_max_iter"], st["em_tol"])
     breaks = _detect_breaks(rows, names, cfg)
     base_idx = names.index("base_rate")
     for n in sorted(breaks):
-        j = names.index(n)
-        post = rows[breaks[n]:]
-        wp, _ = em_weights([(r["v"], r["y"], r["ps"]) for r in post], alpha, st["em_max_iter"], st["em_tol"])
+        j, b = names.index(n), breaks[n]
+        wp, _ = em_weights([(r["v"], r["y"], r["ps"]) for r in rows[b:]], alpha, st["em_max_iter"], st["em_tol"])
+        wpre, _ = em_weights([(r["v"], r["y"], r["ps"]) for r in rows[:b]], alpha, st["em_max_iter"], st["em_tol"])
+        freed = 0.0
         if wp[j] < w[j]:
-            w[base_idx] += w[j] - wp[j]
+            freed += w[j] - wp[j]
             w[j] = wp[j]
+        # Les autres sources ne profitent pas de la rupture : plafonnées à leur poids d'avant.
+        for i, m in enumerate(names):
+            if i != base_idx and i != j and m not in breaks and w[i] > wpre[i]:
+                freed += w[i] - wpre[i]
+                w[i] = wpre[i]
+        w[base_idx] += freed
     return w, breaks, it
 
 
